@@ -1,5 +1,6 @@
 # Java / Maven
 backend/target/
+!backend/.mvn/wrapper/maven-wrapper.jar
 *.class
 *.jar
 *.war
@@ -27,3 +28,4 @@ Thumbs.db
 # Env
 .env
 .env.*
+!.env.example

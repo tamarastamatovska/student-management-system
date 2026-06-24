@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5433/student_db
-    username: sms_user
-    password: sms_pass
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/student_db}
+    username: ${SPRING_DATASOURCE_USERNAME:sms_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:sms_pass}
   jpa:
     hibernate:
       ddl-auto: update

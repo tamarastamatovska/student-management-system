@@ -2,107 +2,133 @@
 
 A full-stack monorepo for managing students with CRUD operations.
 
-PostgreSQL runs on **localhost:5433** (mapped from container port 5432 to avoid conflicts with a local Postgres install).
+**Repository:** https://github.com/tamarastamatovska/student-management-system
+
+**Stack:** React (Vite + TypeScript + MUI) · Spring Boot 3 · PostgreSQL · Docker · GitHub Actions
+
+[![CI](https://github.com/tamarastamatovska/student-management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/tamarastamatovska/student-management-system/actions/workflows/ci.yml)
+
+## Architecture
+
+Three services (assignment requirement):
+
+| Service | Technology | Port |
+|---------|------------|------|
+| Frontend | React + Nginx | 80 |
+| Backend | Spring Boot REST API | 8080 |
+| Database | PostgreSQL 16 | 5433 (host) / 5432 (container) |
+
+```
+Browser → Frontend (Nginx) → Backend (Spring Boot) → PostgreSQL
+                ↓ proxy /api
+```
 
 ## Prerequisites
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for PostgreSQL)
-- JDK 17+
-- Maven 3.9+ (or use included `mvnw.cmd` / `./mvnw` in `backend/`)
-- Node.js 18+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- For local dev without full Docker: JDK 17+, Node.js 18+
 
-## Project structure
-
-```
-student-management-system/
-├── backend/           # Spring Boot REST API
-├── frontend/          # React + Vite + MUI
-├── docker-compose.yml # PostgreSQL for local dev
-└── package.json       # Root dev scripts
-```
-
-## Quick start
-
-### 1. Start the database
+## Quick start — full stack with Docker Compose
 
 ```bash
-docker compose up -d
+docker compose up --build -d
 ```
 
-### 2. Start the backend
+| URL | Description |
+|-----|-------------|
+| http://localhost | Web UI |
+| http://localhost:8080/api/students | REST API |
+
+Stop:
 
 ```bash
+docker compose down
+```
+
+## Local development (hybrid)
+
+Run only the database in Docker, then start backend and frontend locally:
+
+```bash
+# 1. Database only
+docker compose up postgres -d
+
+# 2. Backend
 cd backend
-./mvnw spring-boot:run   # macOS/Linux
 .\mvnw.cmd spring-boot:run   # Windows PowerShell
-```
+# ./mvnw spring-boot:run     # macOS/Linux
 
-Set `JAVA_HOME` to your JDK folder (e.g. `C:\Users\stama\.jdks\ms-17.0.19`) with **no trailing spaces**.
-
-API runs at `http://localhost:8080`
-
-### 3. Start the frontend
-
-```bash
+# 3. Frontend
 cd frontend
 npm install
 npm run dev
 ```
 
-UI runs at `http://localhost:5173`
+| URL | Description |
+|-----|-------------|
+| http://localhost:5173 | Web UI (Vite dev server) |
+| http://localhost:8080 | REST API |
 
-### Root scripts (optional)
+PostgreSQL is on **localhost:5433** for local dev.
 
-From the repo root:
+Set `JAVA_HOME` to your JDK folder (e.g. `C:\Users\stama\.jdks\ms-17.0.19`) with no trailing spaces.
 
-```bash
-npm run db:up      # Start PostgreSQL
-npm run backend    # Start Spring Boot
-npm run frontend   # Start Vite dev server
+## Project structure
+
 ```
+student-management-system/
+├── .github/workflows/ci.yml   # GitHub Actions CI
+├── docker-compose.yml         # postgres + backend + frontend
+├── pom.xml                    # Maven parent (backend module)
+├── backend/
+│   ├── Dockerfile
+│   └── src/...
+├── frontend/
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   └── src/...
+└── package.json               # Root dev scripts
+```
+
+## CI pipeline (GitHub Actions)
+
+On every **push** and **pull request** to `main`:
+
+1. Run backend tests (`mvn test`)
+2. Build frontend (`npm ci && npm run build`)
+
+On **push to main** only:
+
+3. Build and push Docker images to Docker Hub:
+   - `<username>/sms-backend:latest`
+   - `<username>/sms-frontend:latest`
+
+### Required GitHub Secrets
+
+| Secret | Description |
+|--------|-------------|
+| `DOCKERHUB_USERNAME` | Your Docker Hub username |
+| `DOCKERHUB_TOKEN` | Docker Hub access token ([create here](https://hub.docker.com/settings/security)) |
 
 ## API endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/students` | List all students |
+| GET | `/api/students` | List students (`?search=` `?major=`) |
+| GET | `/api/students/stats` | Dashboard statistics |
 | GET | `/api/students/{id}` | Get one student |
 | POST | `/api/students` | Create student |
 | PUT | `/api/students/{id}` | Update student |
 | DELETE | `/api/students/{id}` | Delete student |
-| GET | `/api/students/stats` | Dashboard stats (total, majors) |
 
-Query params for `GET /api/students`:
-- `search` — filter by name or email
-- `major` — filter by major
+## Assignment checklist
 
-### Example create request
+- [x] Public Git repository
+- [x] Dockerized frontend and backend (`backend/Dockerfile`, `frontend/Dockerfile`)
+- [x] Docker Compose orchestration (postgres + backend + frontend)
+- [x] CI pipeline (GitHub Actions — build, test, publish to Docker Hub)
+- [ ] CD deployment (out of scope for now)
 
-```bash
-curl -X POST http://localhost:8080/api/students \
-  -H "Content-Type: application/json" \
-  -d "{\"firstName\":\"Jane\",\"lastName\":\"Doe\",\"email\":\"jane@example.com\"}"
-```
+## Environment variables
 
-## Student fields
-
-| Field | Required | Notes |
-|-------|----------|-------|
-| firstName | Yes | |
-| lastName | Yes | |
-| email | Yes | Must be unique |
-| phone | No | |
-| dateOfBirth | No | ISO date (`YYYY-MM-DD`) |
-| major | No | |
-| enrollmentDate | No | Defaults to today on create |
-
-## Smoke test checklist
-
-- [ ] `docker compose up -d` — Postgres healthy on port **5433**
-- [ ] Backend starts on `:8080` without errors
-- [ ] `GET http://localhost:8080/api/students` returns `[]`
-- [ ] Frontend loads at `http://localhost:5173`
-- [ ] Create a student → appears in table
-- [ ] Edit student → changes persist after refresh
-- [ ] Delete student → removed from DB
-- [ ] Duplicate email → shows error message (409)
+See [`.env.example`](.env.example) for configurable values. Copy to `.env` for local overrides (never commit `.env`).
