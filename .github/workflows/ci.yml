@@ -76,6 +76,7 @@ jobs:
     needs: docker-publish
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -88,7 +89,14 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Configure kubectl for EKS
-        run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
+        run: |
+          aws eks update-kubeconfig \
+            --name "${{ secrets.EKS_CLUSTER_NAME }}" \
+            --region "${{ secrets.AWS_REGION }}"
+          kubectl cluster-info
+
+      - name: Install envsubst
+        run: sudo apt-get update && sudo apt-get install -y gettext-base
 
       - name: Deploy to Kubernetes
         env:
@@ -98,8 +106,36 @@ jobs:
           chmod +x k8s/deploy.sh
           ./k8s/deploy.sh
 
-      - name: Show ingress URL
+      - name: Wait for ALB and patch CORS
         run: |
-          echo "Waiting for ALB hostname..."
-          sleep 30
-          kubectl get ingress sms-ingress -n sms || true
+          echo "Waiting for ALB hostname (up to 5 minutes)..."
+          ALB=""
+          for _ in $(seq 1 30); do
+            ALB=$(kubectl get ingress sms-ingress -n sms \
+              -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+            if [ -n "$ALB" ]; then
+              break
+            fi
+            sleep 10
+          done
+
+          if [ -z "$ALB" ]; then
+            echo "::warning::ALB hostname not ready yet. Check ingress later with kubectl."
+            kubectl get ingress sms-ingress -n sms || true
+            exit 0
+          fi
+
+          echo "ALB hostname: $ALB"
+          kubectl patch configmap backend-config -n sms --type merge \
+            -p "{\"data\":{\"CORS_ALLOWED_ORIGINS\":\"http://localhost,http://localhost:5173,http://${ALB}\"}}"
+          kubectl rollout restart deployment/backend -n sms
+          kubectl rollout status deployment/backend -n sms --timeout=180s
+
+          echo "## Deployment live" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**App URL:** http://${ALB}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**API test:** http://${ALB}/api/students/stats" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Show cluster resources
+        run: kubectl get all,ingress,pvc -n sms

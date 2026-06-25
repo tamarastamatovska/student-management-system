@@ -1,0 +1,27 @@
+# Standard AWS account EKS cluster (used by Provision EKS GitHub Actions workflow).
+#
+# Region and name are substituted from GitHub Secrets:
+#   EKS_CLUSTER_NAME, AWS_REGION
+#
+# Manual create:
+#   export EKS_CLUSTER_NAME=sms-cluster AWS_REGION=eu-north-1
+#   envsubst < k8s/eksctl.yaml | eksctl create cluster -f -
+#
+# Delete:
+#   eksctl delete cluster --name sms-cluster --region eu-north-1
+
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: ${EKS_CLUSTER_NAME}
+  region: ${AWS_REGION}
+  version: "1.29"
+
+managedNodeGroups:
+  - name: sms-nodes
+    instanceType: t3.medium
+    desiredCapacity: 1
+    minSize: 1
+    maxSize: 1
+    volumeSize: 20

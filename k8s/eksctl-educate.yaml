@@ -1,0 +1,34 @@
+# Minimal EKS cluster for AWS Educate Starter accounts.
+#
+# Educate constraints this config respects:
+#   - Region must be us-east-1
+#   - No NAT Gateway
+#   - Node type m5.large (t3 is often blocked)
+#   - Single node to conserve credits
+#
+# Create:
+#   eksctl create cluster -f k8s/eksctl-educate.yaml
+#
+# Delete when done (saves credits):
+#   eksctl delete cluster --name sms-cluster --region us-east-1
+
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: sms-cluster
+  region: us-east-1
+  version: "1.29"
+
+vpc:
+  nat:
+    gateway: Disabled
+
+managedNodeGroups:
+  - name: sms-nodes
+    instanceType: m5.large
+    desiredCapacity: 1
+    minSize: 1
+    maxSize: 1
+    volumeSize: 20
+    privateNetworking: false

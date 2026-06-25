@@ -1,0 +1,64 @@
+name: Provision EKS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install eksctl
+        run: |
+          curl -sSL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" | tar xz -C /tmp
+          sudo mv /tmp/eksctl /usr/local/bin
+          eksctl version
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Create EKS cluster
+        env:
+          EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          sudo apt-get update && sudo apt-get install -y gettext-base
+          if eksctl get cluster --name "${EKS_CLUSTER_NAME}" --region "${AWS_REGION}" >/dev/null 2>&1; then
+            echo "Cluster ${EKS_CLUSTER_NAME} already exists — skipping create."
+          else
+            export EKS_CLUSTER_NAME AWS_REGION
+            envsubst < k8s/eksctl.yaml | eksctl create cluster -f -
+          fi
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig \
+            --name "${{ secrets.EKS_CLUSTER_NAME }}" \
+            --region "${{ secrets.AWS_REGION }}"
+          kubectl get nodes
+
+      - name: Install cluster add-ons
+        env:
+          EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          chmod +x k8s/install-cluster-addons.sh
+          ./k8s/install-cluster-addons.sh
+
+      - name: Summary
+        run: |
+          echo "## EKS cluster ready" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Cluster: \`${{ secrets.EKS_CLUSTER_NAME }}\` in \`${{ secrets.AWS_REGION }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Push to \`main\` to deploy the app via the **CI/CD** workflow." >> "$GITHUB_STEP_SUMMARY"

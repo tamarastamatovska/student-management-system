@@ -93,6 +93,14 @@ student-management-system/
 
 ## CI/CD pipeline (GitHub Actions)
 
+Everything runs through GitHub Actions — no manual deploy needed.
+
+| Workflow | When | What |
+|----------|------|------|
+| **CI/CD** | Push/PR to `main` | Test → Docker Hub → deploy to EKS |
+| **Provision EKS** | Manual once | Create cluster + add-ons |
+| **Destroy EKS** | Manual when done | Delete cluster (save credits) |
+
 On every **push** and **pull request** to `main`:
 
 1. Run backend tests (`mvn test`)
@@ -101,7 +109,8 @@ On every **push** and **pull request** to `main`:
 On **push to main** only:
 
 3. Build and push Docker images to Docker Hub
-4. **Deploy to EKS** (namespace `sms`) via `k8s/deploy.sh`
+4. Deploy to EKS (namespace `sms`) via `k8s/deploy.sh`
+5. Patch CORS and print live URL in job Summary
 
 ### Required GitHub Secrets
 
@@ -109,10 +118,21 @@ On **push to main** only:
 |--------|-------------|
 | `DOCKERHUB_USERNAME` | Your Docker Hub username |
 | `DOCKERHUB_TOKEN` | Docker Hub access token |
-| `AWS_ACCESS_KEY_ID` | IAM key for EKS deploy |
-| `AWS_SECRET_ACCESS_KEY` | IAM secret for EKS deploy |
-| `AWS_REGION` | e.g. `eu-central-1` |
-| `EKS_CLUSTER_NAME` | Your EKS cluster name |
+| `AWS_ACCESS_KEY_ID` | IAM key for EKS (same user that provisions cluster) |
+| `AWS_SECRET_ACCESS_KEY` | IAM secret for EKS |
+| `AWS_REGION` | `eu-north-1` (Europe Stockholm) |
+| `EKS_CLUSTER_NAME` | `sms-cluster` |
+
+### First-time AWS setup
+
+Step-by-step guide: **[k8s/AWS-SETUP.md](k8s/AWS-SETUP.md)**
+
+1. Create IAM user `github-actions` + access keys in AWS Console
+2. Add GitHub Secrets (`AWS_REGION=eu-north-1`)
+3. Run **Provision EKS** workflow once
+4. Push to `main` — app deploys automatically
+
+*(AWS Educate learning portal only? See [k8s/AWS-EDUCATE.md](k8s/AWS-EDUCATE.md) — a standard AWS account like yours is easier.)*
 
 ## Kubernetes (Amazon EKS)
 
@@ -125,16 +145,7 @@ Manifests in [`k8s/`](k8s/) deploy all three services to namespace **`sms`**:
 | Deployment + Service + ConfigMap | Frontend (nginx) |
 | Ingress (ALB) | Public HTTP URL |
 
-Full EKS setup and deploy instructions: **[k8s/README.md](k8s/README.md)**
-
-Quick manual deploy:
-
-```bash
-export IMAGE_BACKEND=<user>/sms-backend:latest
-export IMAGE_FRONTEND=<user>/sms-frontend:latest
-./k8s/deploy.sh
-kubectl get ingress sms-ingress -n sms
-```
+Details: **[k8s/README.md](k8s/README.md)** · Setup: **[k8s/AWS-SETUP.md](k8s/AWS-SETUP.md)**
 
 ## API endpoints
 

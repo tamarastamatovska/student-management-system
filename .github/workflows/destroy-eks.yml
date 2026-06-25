@@ -1,0 +1,40 @@
+name: Destroy EKS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install eksctl
+        run: |
+          curl -sSL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" | tar xz -C /tmp
+          sudo mv /tmp/eksctl /usr/local/bin
+
+      - name: Delete application namespace
+        run: |
+          aws eks update-kubeconfig \
+            --name "${{ secrets.EKS_CLUSTER_NAME }}" \
+            --region "${{ secrets.AWS_REGION }}" || true
+          kubectl delete namespace sms --ignore-not-found=true --timeout=120s || true
+
+      - name: Delete EKS cluster
+        run: |
+          eksctl delete cluster \
+            --name "${{ secrets.EKS_CLUSTER_NAME }}" \
+            --region "${{ secrets.AWS_REGION }}" \
+            --wait
+
+      - name: Summary
+        run: |
+          echo "## EKS cluster deleted" >> "$GITHUB_STEP_SUMMARY"
+          echo "Credits are no longer consumed by this cluster." >> "$GITHUB_STEP_SUMMARY"

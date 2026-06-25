@@ -2,6 +2,10 @@
 
 Deploy the Student Management System to namespace `sms` on Amazon EKS.
 
+**Full setup via GitHub Actions:** see **[AWS-SETUP.md](AWS-SETUP.md)** (standard AWS account).
+
+For AWS Educate Starter / classroom accounts only: **[AWS-EDUCATE.md](AWS-EDUCATE.md)**.
+
 ## Architecture
 
 ```
@@ -9,6 +13,14 @@ Internet → ALB (Ingress) → frontend Service → frontend Pods (nginx)
                                     ↓ /api proxy
                               backend Service → backend Pods → postgres StatefulSet
 ```
+
+## GitHub Actions workflows
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `ci.yml` | Push/PR to `main` | Test, Docker Hub publish, deploy to EKS |
+| `provision-eks.yml` | Manual (once) | Create cluster + add-ons |
+| `destroy-eks.yml` | Manual | Delete cluster to save credits |
 
 ## Manifests
 
@@ -26,58 +38,11 @@ Internet → ALB (Ingress) → frontend Service → frontend Pods (nginx)
 | `frontend/service.yaml` | ClusterIP Service | Internal UI :80 |
 | `frontend/deployment.yaml` | Deployment | React static + nginx |
 | `ingress.yaml` | Ingress (ALB) | Public HTTP access |
+| `eksctl.yaml` | eksctl config | Standard AWS cluster (any region via secrets) |
+| `eksctl-educate.yaml` | eksctl config | Educate-only fallback (`us-east-1`) |
+| `install-cluster-addons.sh` | Script | EBS CSI + ALB controller |
 
-## EKS prerequisites (one-time)
-
-1. **EKS cluster** running in your AWS account
-2. **kubectl** + **AWS CLI** installed locally
-3. **AWS Load Balancer Controller** installed on the cluster  
-   https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html
-4. **EBS CSI driver** add-on enabled (for Postgres PVCs)
-5. Configure kubectl:
-   ```bash
-   aws eks update-kubeconfig --name <cluster-name> --region <region>
-   ```
-
-## Manual deploy
-
-```bash
-export IMAGE_BACKEND=<dockerhub-user>/sms-backend:latest
-export IMAGE_FRONTEND=<dockerhub-user>/sms-frontend:latest
-
-chmod +x k8s/deploy.sh
-./k8s/deploy.sh
-```
-
-Get the public URL:
-
-```bash
-kubectl get ingress sms-ingress -n sms -w
-```
-
-Test API:
-
-```bash
-ALB=$(kubectl get ingress sms-ingress -n sms -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-curl http://$ALB/api/students/stats
-```
-
-## CORS after ALB is ready
-
-Update backend ConfigMap with your ALB URL:
-
-```bash
-ALB=$(kubectl get ingress sms-ingress -n sms -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-kubectl patch configmap backend-config -n sms --type merge \
-  -p "{\"data\":{\"CORS_ALLOWED_ORIGINS\":\"http://localhost,http://localhost:5173,http://${ALB}\"}}"
-kubectl rollout restart deployment/backend -n sms
-```
-
-## CD via GitHub Actions
-
-On push to `main`, the `deploy-kubernetes` job runs after images are pushed.
-
-Required GitHub Secrets:
+## Required GitHub Secrets
 
 | Secret | Example |
 |--------|---------|
@@ -85,23 +50,32 @@ Required GitHub Secrets:
 | `DOCKERHUB_TOKEN` | Docker Hub access token |
 | `AWS_ACCESS_KEY_ID` | IAM access key |
 | `AWS_SECRET_ACCESS_KEY` | IAM secret key |
-| `AWS_REGION` | `eu-central-1` |
-| `EKS_CLUSTER_NAME` | `my-eks-cluster` |
+| `AWS_REGION` | `eu-north-1` |
+| `EKS_CLUSTER_NAME` | `sms-cluster` |
+
+## One-time setup
+
+1. Add GitHub Secrets (see table above)
+2. Run **Provision EKS** workflow in Actions tab
+3. Push to `main` — **CI/CD** deploys automatically
+
+Live URL appears in the deploy job **Summary**.
 
 ## Troubleshooting
 
 | Issue | Fix |
 |-------|-----|
-| `ImagePullBackOff` | Check Docker Hub image name and that images are public |
-| Ingress has no ADDRESS | Install AWS Load Balancer Controller; wait 2–3 min |
-| Backend `CrashLoopBackOff` | Wait for postgres StatefulSet; check `kubectl logs -n sms deployment/backend` |
-| PVC pending | Enable EBS CSI driver; verify `gp2` StorageClass exists |
-| CORS errors in browser | Patch `backend-config` with ALB URL (see above) |
+| `ImagePullBackOff` | Make Docker Hub images public |
+| Ingress has no ADDRESS | Run Provision EKS; wait 2–5 min |
+| Backend `CrashLoopBackOff` | Wait for postgres; check logs |
+| PVC pending | Provision EKS installs EBS CSI driver |
+| CORS errors | Re-run CI/CD (CORS patched automatically) |
+| Deploy auth errors | Same IAM user must have created the cluster |
 
 ## Tear down
 
-```bash
-kubectl delete namespace sms
-```
+Run the **Destroy EKS** workflow in GitHub Actions, or manually:
 
-This removes all resources including the Postgres PVC.
+```bash
+eksctl delete cluster --name sms-cluster --region us-east-1
+```
