@@ -6,7 +6,6 @@ set -euo pipefail
 
 CLUSTER_NAME="${EKS_CLUSTER_NAME:?EKS_CLUSTER_NAME required}"
 AWS_REGION="${AWS_REGION:?AWS_REGION required}"
-AWS_AZ="${AWS_AZ:-${AWS_REGION}a}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NODEGROUP_NAME="sms-nodes"
 
@@ -45,7 +44,10 @@ dump_cf_errors() {
       --output table 2>/dev/null || echo "(stack not found or no events)"
   done
   echo ""
-  echo "=== Tip: new accounts often need EC2 vCPU quota increase (Service Quotas → EC2) ==="
+  echo "=== Tips ==="
+  echo "- Free account plan: only t3.micro/t2.micro allowed (see eksctl.yaml)"
+  echo "- To use t3.medium+: Billing → upgrade from Free account plan (uses credits)"
+  echo "- Quota issues: Service Quotas → EC2 → On-Demand Standard vCPUs"
 }
 
 if cluster_exists; then
@@ -60,8 +62,8 @@ if cluster_exists; then
   eksctl delete cluster --name "${CLUSTER_NAME}" --region "${AWS_REGION}" --wait --timeout 45m
 fi
 
-echo "Creating cluster ${CLUSTER_NAME} in ${AWS_REGION} (AZ ${AWS_AZ})..."
-export EKS_CLUSTER_NAME="${CLUSTER_NAME}" AWS_REGION AWS_AZ
+echo "Creating cluster ${CLUSTER_NAME} in ${AWS_REGION}..."
+export EKS_CLUSTER_NAME="${CLUSTER_NAME}" AWS_REGION
 
 if ! envsubst < "${SCRIPT_DIR}/eksctl.yaml" | eksctl create cluster -f - --timeout 90m; then
   echo "Cluster creation failed."

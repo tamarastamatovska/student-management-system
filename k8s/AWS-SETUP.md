@@ -9,9 +9,23 @@ Use this guide with a **standard AWS account** (like the one in your AWS Console
 | **Destroy EKS** | Manual (when demo is done) | Delete cluster to stop charges |
 
 **Recommended region:** `eu-north-1` (Europe Stockholm — matches your console)  
-**Cluster name:** `sms-cluster`
+**Cluster name:** `sms-cluster`  
+**Node type:** `t3.micro` (Free Tier eligible — required on new Free account plans)
 
 New AWS accounts often receive **~$200 free credits** for the first months. Delete the cluster when done to avoid ongoing charges.
+
+### Free account plan (important)
+
+New AWS accounts start on a **Free account plan** that only allows **Free Tier EC2 types** (e.g. `t3.micro`). Larger types like `t3.medium` or `m5.large` will fail with:
+
+> *The specified instance type is not eligible for Free Tier*
+
+**Option A (default in this repo):** Use `t3.micro` — works on Free account plan (tight on RAM but OK for demo).
+
+**Option B (recommended if demo is slow or pods crash):** Upgrade to paid access so credits apply:
+1. AWS Console → **Billing and Cost Management**
+2. Look for **Free account plan** / **Upgrade** / activate full account access
+3. Change `k8s/eksctl.yaml` to `instanceTypes: ["t3.medium"]` and re-run **Provision EKS**
 
 ---
 
