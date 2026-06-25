@@ -20,7 +20,7 @@ echo "==> OIDC provider for IRSA..."
 eksctl utils associate-iam-oidc-provider \
   --cluster="${CLUSTER_NAME}" \
   --region="${AWS_REGION}" \
-  --approve
+  --approve 2>/dev/null || echo "OIDC provider already associated."
 
 echo "==> ALB controller IAM policy..."
 curl -sS -o /tmp/alb-iam-policy.json \

@@ -6,7 +6,7 @@ on:
 jobs:
   provision:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,12 +33,8 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           sudo apt-get update && sudo apt-get install -y gettext-base
-          if eksctl get cluster --name "${EKS_CLUSTER_NAME}" --region "${AWS_REGION}" >/dev/null 2>&1; then
-            echo "Cluster ${EKS_CLUSTER_NAME} already exists — skipping create."
-          else
-            export EKS_CLUSTER_NAME AWS_REGION
-            envsubst < k8s/eksctl.yaml | eksctl create cluster -f -
-          fi
+          chmod +x k8s/provision-cluster.sh
+          ./k8s/provision-cluster.sh
 
       - name: Configure kubectl
         run: |
