@@ -64,6 +64,18 @@ jobs:
           chmod +x k8s/install-cluster-addons.sh
           ./k8s/install-cluster-addons.sh
 
+      - name: Dump addon errors on failure
+        if: failure()
+        env:
+          EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
+          kubectl get nodes
+          kubectl get pods -A --field-selector=status.phase!=Running,status.phase!=Succeeded 2>/dev/null || true
+          kubectl describe deployment aws-load-balancer-controller -n kube-system 2>/dev/null | tail -30 || true
+          kubectl describe pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller 2>/dev/null | tail -50 || true
+
       - name: Summary
         run: |
           echo "## EKS cluster ready" >> "$GITHUB_STEP_SUMMARY"
