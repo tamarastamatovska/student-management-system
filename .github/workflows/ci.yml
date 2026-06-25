@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -71,3 +71,35 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/sms-frontend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/sms-frontend:sha-${{ github.sha }}
+
+  deploy-kubernetes:
+    needs: docker-publish
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Configure kubectl for EKS
+        run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to Kubernetes
+        env:
+          IMAGE_BACKEND: ${{ secrets.DOCKERHUB_USERNAME }}/sms-backend:sha-${{ github.sha }}
+          IMAGE_FRONTEND: ${{ secrets.DOCKERHUB_USERNAME }}/sms-frontend:sha-${{ github.sha }}
+        run: |
+          chmod +x k8s/deploy.sh
+          ./k8s/deploy.sh
+
+      - name: Show ingress URL
+        run: |
+          echo "Waiting for ALB hostname..."
+          sleep 30
+          kubectl get ingress sms-ingress -n sms || true

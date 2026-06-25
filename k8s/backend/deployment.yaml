@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: sms
+  labels:
+    app: sms-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sms-backend
+  template:
+    metadata:
+      labels:
+        app: sms-backend
+    spec:
+      containers:
+        - name: backend
+          image: ${IMAGE_BACKEND}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: backend-config
+          env:
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /api/students/stats
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/students/stats
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 20

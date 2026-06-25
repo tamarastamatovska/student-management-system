@@ -4,9 +4,9 @@ A full-stack monorepo for managing students with CRUD operations.
 
 **Repository:** https://github.com/tamarastamatovska/student-management-system
 
-**Stack:** React (Vite + TypeScript + MUI) · Spring Boot 3 · PostgreSQL · Docker · GitHub Actions
+**Stack:** React (Vite + TypeScript + MUI) · Spring Boot 3 · PostgreSQL · Docker · GitHub Actions · Kubernetes (EKS)
 
-[![CI](https://github.com/tamarastamatovska/student-management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/tamarastamatovska/student-management-system/actions/workflows/ci.yml)
+[![CI/CD](https://github.com/tamarastamatovska/student-management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/tamarastamatovska/student-management-system/actions/workflows/ci.yml)
 
 ## Architecture
 
@@ -77,7 +77,8 @@ Set `JAVA_HOME` to your JDK folder (e.g. `C:\Users\stama\.jdks\ms-17.0.19`) with
 
 ```
 student-management-system/
-├── .github/workflows/ci.yml   # GitHub Actions CI
+├── .github/workflows/ci.yml   # GitHub Actions CI/CD
+├── k8s/                     # Kubernetes manifests (EKS)
 ├── docker-compose.yml         # postgres + backend + frontend
 ├── pom.xml                    # Maven parent (backend module)
 ├── backend/
@@ -90,7 +91,7 @@ student-management-system/
 └── package.json               # Root dev scripts
 ```
 
-## CI pipeline (GitHub Actions)
+## CI/CD pipeline (GitHub Actions)
 
 On every **push** and **pull request** to `main`:
 
@@ -99,16 +100,41 @@ On every **push** and **pull request** to `main`:
 
 On **push to main** only:
 
-3. Build and push Docker images to Docker Hub:
-   - `<username>/sms-backend:latest`
-   - `<username>/sms-frontend:latest`
+3. Build and push Docker images to Docker Hub
+4. **Deploy to EKS** (namespace `sms`) via `k8s/deploy.sh`
 
 ### Required GitHub Secrets
 
 | Secret | Description |
 |--------|-------------|
 | `DOCKERHUB_USERNAME` | Your Docker Hub username |
-| `DOCKERHUB_TOKEN` | Docker Hub access token ([create here](https://hub.docker.com/settings/security)) |
+| `DOCKERHUB_TOKEN` | Docker Hub access token |
+| `AWS_ACCESS_KEY_ID` | IAM key for EKS deploy |
+| `AWS_SECRET_ACCESS_KEY` | IAM secret for EKS deploy |
+| `AWS_REGION` | e.g. `eu-central-1` |
+| `EKS_CLUSTER_NAME` | Your EKS cluster name |
+
+## Kubernetes (Amazon EKS)
+
+Manifests in [`k8s/`](k8s/) deploy all three services to namespace **`sms`**:
+
+| Resource | App component |
+|----------|---------------|
+| StatefulSet + Secret + ConfigMap | PostgreSQL database |
+| Deployment + Service + ConfigMap | Backend API |
+| Deployment + Service + ConfigMap | Frontend (nginx) |
+| Ingress (ALB) | Public HTTP URL |
+
+Full EKS setup and deploy instructions: **[k8s/README.md](k8s/README.md)**
+
+Quick manual deploy:
+
+```bash
+export IMAGE_BACKEND=<user>/sms-backend:latest
+export IMAGE_FRONTEND=<user>/sms-frontend:latest
+./k8s/deploy.sh
+kubectl get ingress sms-ingress -n sms
+```
 
 ## API endpoints
 
@@ -124,10 +150,14 @@ On **push to main** only:
 ## Assignment checklist
 
 - [x] Public Git repository
-- [x] Dockerized frontend and backend (`backend/Dockerfile`, `frontend/Dockerfile`)
-- [x] Docker Compose orchestration (postgres + backend + frontend)
-- [x] CI pipeline (GitHub Actions — build, test, publish to Docker Hub)
-- [ ] CD deployment (out of scope for now)
+- [x] Dockerized frontend and backend
+- [x] Docker Compose orchestration
+- [x] CI pipeline (build, test, publish to Docker Hub)
+- [x] Kubernetes: Deployments + ConfigMaps/Secrets (frontend, backend)
+- [x] Kubernetes: Services (frontend, backend)
+- [x] Kubernetes: Ingress (ALB on EKS)
+- [x] Kubernetes: StatefulSet + ConfigMaps/Secrets (postgres)
+- [x] CD: deploy to namespace `sms` on EKS via GitHub Actions
 
 ## Environment variables
 
