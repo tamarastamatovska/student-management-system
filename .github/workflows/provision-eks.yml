@@ -6,7 +6,7 @@ on:
 jobs:
   provision:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,6 +35,19 @@ jobs:
           sudo apt-get update && sudo apt-get install -y gettext-base
           chmod +x k8s/provision-cluster.sh
           ./k8s/provision-cluster.sh
+
+      - name: Dump CloudFormation errors on failure
+        if: failure()
+        env:
+          EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          for stack in "eksctl-${EKS_CLUSTER_NAME}-nodegroup-sms-nodes" "eksctl-${EKS_CLUSTER_NAME}-cluster"; do
+            echo "=== ${stack} ==="
+            aws cloudformation describe-stack-events --stack-name "$stack" --region "$AWS_REGION" \
+              --query 'StackEvents[?contains(ResourceStatus, `FAILED`)].{Resource:LogicalResourceId,Reason:ResourceStatusReason}' \
+              --output table 2>/dev/null || echo "(no stack)"
+          done
 
       - name: Configure kubectl
         run: |
