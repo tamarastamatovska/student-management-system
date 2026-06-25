@@ -9,6 +9,11 @@ AWS_REGION="${AWS_REGION:-us-east-1}"
 
 echo "==> Cluster: ${CLUSTER_NAME} (${AWS_REGION})"
 
+aws eks update-kubeconfig --name "${CLUSTER_NAME}" --region "${AWS_REGION}"
+
+echo "==> Waiting for node(s) to be Ready..."
+kubectl wait --for=condition=Ready nodes --all --timeout=600s
+
 echo "==> EBS CSI driver add-on..."
 eksctl create addon \
   --name aws-ebs-csi-driver \
@@ -45,14 +50,24 @@ eksctl create iamserviceaccount \
   --override-existing-serviceaccounts \
   --approve
 
-echo "==> Helm: AWS Load Balancer Controller..."
-helm repo add eks https://aws.github.io/eks-charts
+echo "==> Helm: AWS Load Balancer Controller (1 replica for t3.micro)..."
+helm repo add eks https://aws.github.io/eks-charts 2>/dev/null || true
 helm repo update
+
+# Default chart uses 2 replicas — too heavy for a single t3.micro node.
 helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
   -n kube-system \
   --set clusterName="${CLUSTER_NAME}" \
   --set serviceAccount.create=false \
   --set serviceAccount.name=aws-load-balancer-controller \
-  --wait --timeout 5m
+  --set replicaCount=1 \
+  --set resources.requests.cpu=100m \
+  --set resources.requests.memory=128Mi \
+  --set resources.limits.cpu=200m \
+  --set resources.limits.memory=256Mi \
+  --wait --timeout 15m
+
+echo "==> Waiting for ALB controller pod..."
+kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=600s
 
 echo "==> Add-ons installed."
