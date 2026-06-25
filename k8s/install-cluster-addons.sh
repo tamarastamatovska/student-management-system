@@ -15,12 +15,36 @@ aws eks update-kubeconfig --name "${CLUSTER_NAME}" --region "${AWS_REGION}"
 dump_alb_debug() {
   echo ""
   echo "=== ALB controller debug ==="
+  NODE="$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")"
   kubectl get nodes -o wide 2>/dev/null || true
-  kubectl top nodes 2>/dev/null || true
+  if [ -n "${NODE}" ]; then
+    echo "Pods on node ${NODE}:"
+    kubectl get pods -A -o wide --field-selector "spec.nodeName=${NODE}" 2>/dev/null || true
+  fi
   kubectl get deployment,pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller 2>/dev/null || true
-  kubectl describe deployment "${ALB_RELEASE}" -n kube-system 2>/dev/null | tail -40 || true
-  kubectl describe pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller 2>/dev/null | tail -80 || true
-  kubectl get events -n kube-system --sort-by='.lastTimestamp' 2>/dev/null | tail -20 || true
+  kubectl describe pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller 2>/dev/null | tail -40 || true
+  kubectl get events -n kube-system --sort-by='.lastTimestamp' 2>/dev/null | tail -15 || true
+  echo ""
+  echo "If you see 'Too many pods': upgrade to t3.medium (Billing → leave Free account plan)."
+}
+
+free_node_pod_slots() {
+  echo "==> Freeing pod slots (t3.micro fits ~4 pods without tuning)..."
+
+  # metrics-server is optional; remove to save a pod slot.
+  kubectl delete deployment metrics-server -n kube-system --ignore-not-found --wait=true --timeout=60s 2>/dev/null || true
+
+  # Default CoreDNS uses 2 replicas; one is enough for a demo cluster.
+  kubectl scale deployment coredns -n kube-system --replicas=1 2>/dev/null || true
+
+  # Prefix delegation raises max pods per node (required for ALB controller on small instances).
+  echo "==> Enabling VPC CNI prefix delegation..."
+  kubectl set env daemonset/aws-node -n kube-system \
+    ENABLE_PREFIX_DELEGATION=true \
+    WARM_PREFIX_TARGET=1 \
+    --overwrite 2>/dev/null || true
+
+  sleep 15
 }
 
 reset_alb_controller() {
@@ -35,6 +59,8 @@ reset_alb_controller() {
 
 echo "==> Waiting for node(s) to be Ready..."
 kubectl wait --for=condition=Ready nodes --all --timeout=600s
+
+free_node_pod_slots
 
 echo "==> EBS CSI driver add-on..."
 eksctl create addon \
@@ -62,14 +88,6 @@ aws iam create-policy \
   2>/dev/null || true
 
 echo "==> ALB controller service account (IRSA)..."
-# Recreate SA so IRSA role is always attached (eksctl skips existing accounts).
-eksctl delete iamserviceaccount \
-  --cluster="${CLUSTER_NAME}" \
-  --namespace=kube-system \
-  --name=aws-load-balancer-controller \
-  --region="${AWS_REGION}" \
-  --wait 2>/dev/null || true
-
 eksctl create iamserviceaccount \
   --cluster="${CLUSTER_NAME}" \
   --namespace=kube-system \
@@ -81,12 +99,12 @@ eksctl create iamserviceaccount \
   --approve
 
 reset_alb_controller
+free_node_pod_slots
 
-echo "==> Helm: AWS Load Balancer Controller (1 replica for t3.micro)..."
+echo "==> Helm: AWS Load Balancer Controller (1 replica)..."
 helm repo add eks https://aws.github.io/eks-charts 2>/dev/null || true
 helm repo update
 
-# Single replica + low memory — required on t3.micro Free Tier nodes.
 if ! helm upgrade --install "${ALB_RELEASE}" eks/aws-load-balancer-controller \
   -n kube-system \
   --set clusterName="${CLUSTER_NAME}" \

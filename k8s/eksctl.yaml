@@ -2,8 +2,9 @@
 #
 # Substituted from env: EKS_CLUSTER_NAME, AWS_REGION
 #
-# Uses t3.micro — Free Tier eligible (required on new "Free account plan" AWS accounts).
-# If your account allows paid instances, you can switch to t3.medium for more RAM.
+# t3.micro = Free Tier eligible but only ~4 pod slots without tuning.
+# Addons below omit metrics-server and enable prefix delegation for more pods.
+# For reliable demos, upgrade AWS account and use t3.medium instead.
 #
 # Manual create:
 #   export EKS_CLUSTER_NAME=sms-cluster AWS_REGION=eu-north-1
@@ -22,6 +23,17 @@ iam:
 
 autoModeConfig:
   enabled: false
+
+addons:
+  - name: vpc-cni
+    configurationValues: |-
+      env:
+        ENABLE_PREFIX_DELEGATION: "true"
+        WARM_PREFIX_TARGET: "1"
+  - name: coredns
+    configurationValues: |-
+      replicaCount: 1
+  - name: kube-proxy
 
 managedNodeGroups:
   - name: sms-nodes

@@ -20,9 +20,9 @@ New AWS accounts start on a **Free account plan** that only allows **Free Tier E
 
 > *The specified instance type is not eligible for Free Tier*
 
-**Option A (default in this repo):** Use `t3.micro` — works on Free account plan (tight on RAM but OK for demo).
+**Option A (default in this repo):** Use `t3.micro` — works on Free account plan. The install script removes `metrics-server`, scales CoreDNS to 1, and enables VPC CNI prefix delegation so the ALB controller can schedule (~5 pod slots needed).
 
-**Option B (recommended if demo is slow or pods crash):** Upgrade to paid access so credits apply:
+**Option B (recommended if add-ons or app pods still fail):** Upgrade to paid access so credits apply:
 1. AWS Console → **Billing and Cost Management**
 2. Look for **Free account plan** / **Upgrade** / activate full account access
 3. Change `k8s/eksctl.yaml` to `instanceTypes: ["t3.medium"]` and re-run **Provision EKS**
