@@ -18,13 +18,23 @@ kubectl wait --for=condition=Ready nodes --all --timeout=600s
 echo "==> Tuning system pods for small nodes..."
 kubectl delete deployment metrics-server -n kube-system --ignore-not-found --wait=true --timeout=60s 2>/dev/null || true
 kubectl scale deployment coredns -n kube-system --replicas=1 2>/dev/null || true
+kubectl set env daemonset/aws-node -n kube-system ENABLE_NETWORK_POLICY=false --overwrite 2>/dev/null || true
 
 echo "==> EBS CSI driver add-on (required for Postgres PVC)..."
 eksctl create addon \
   --name aws-ebs-csi-driver \
   --cluster "${CLUSTER_NAME}" \
   --region "${AWS_REGION}" \
-  --force
+  --force \
+  --configurationValues '{"controller":{"replicaCount":1}}' 2>/dev/null \
+  || eksctl create addon \
+    --name aws-ebs-csi-driver \
+    --cluster "${CLUSTER_NAME}" \
+    --region "${AWS_REGION}" \
+    --force
+
+aws eks update-kubeconfig --name "${CLUSTER_NAME}" --region "${AWS_REGION}"
+kubectl scale deployment ebs-csi-controller -n kube-system --replicas=1 2>/dev/null || true
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "==> Applying EBS CSI StorageClass..."

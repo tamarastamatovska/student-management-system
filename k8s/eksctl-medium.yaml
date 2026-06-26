@@ -1,9 +1,7 @@
-# AWS Free account plan — 2× t3.micro nodes (used by Provision EKS workflow).
+# EKS cluster config — use after upgrading AWS from Free account plan.
+# t3.medium (4 GB RAM) is required to run postgres + backend + frontend reliably.
 #
-# Two nodes spread system + app pods; single micro is too small for full stack.
-# Substituted from env: EKS_CLUSTER_NAME, AWS_REGION
-#
-# After changing node count: Destroy EKS → Provision EKS
+#   Destroy EKS → Provision EKS (with this file as eksctl.yaml)
 
 apiVersion: eksctl.io/v1alpha5
 kind: ClusterConfig
@@ -25,7 +23,6 @@ addons:
       env:
         ENABLE_PREFIX_DELEGATION: "true"
         WARM_PREFIX_TARGET: "1"
-        ENABLE_NETWORK_POLICY: "false"
   - name: coredns
     configurationValues: |-
       replicaCount: 1
@@ -33,10 +30,10 @@ addons:
 
 managedNodeGroups:
   - name: sms-nodes
-    instanceTypes: ["t3.micro"]
+    instanceTypes: ["t3.medium"]
     maxPodsPerNode: 110
-    desiredCapacity: 2
-    minSize: 2
-    maxSize: 2
+    desiredCapacity: 1
+    minSize: 1
+    maxSize: 1
     volumeSize: 20
     privateNetworking: false

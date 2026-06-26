@@ -15,6 +15,15 @@ spec:
       labels:
         app: sms-backend
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: postgres
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: backend
           image: ${IMAGE_BACKEND}
@@ -23,15 +32,17 @@ spec:
             - containerPort: 8080
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: 50m
+              memory: 96Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 300m
+              memory: 320Mi
           envFrom:
             - configMapRef:
                 name: backend-config
           env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=50.0 -XX:+UseSerialGC"
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:

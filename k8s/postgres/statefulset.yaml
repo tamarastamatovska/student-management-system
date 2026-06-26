@@ -14,9 +14,24 @@ spec:
       labels:
         app: postgres
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: sms-backend
+                topologyKey: kubernetes.io/hostname
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: sms-frontend
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: postgres
-          image: postgres:16
+          image: postgres:16-alpine
           ports:
             - containerPort: 5432
               name: postgres
@@ -30,11 +45,11 @@ spec:
                 name: postgres-config
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: 50m
+              memory: 48Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 200m
+              memory: 160Mi
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data

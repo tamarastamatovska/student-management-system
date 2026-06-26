@@ -10,22 +10,24 @@ Use this guide with a **standard AWS account** (like the one in your AWS Console
 
 **Recommended region:** `eu-north-1` (Europe Stockholm — matches your console)  
 **Cluster name:** `sms-cluster`  
-**Node type:** `t3.micro` (Free Tier eligible — required on new Free account plans)
+**Node type:** `2× t3.micro` (Free Tier — required on Free account plan)
 
 New AWS accounts often receive **~$200 free credits** for the first months. Delete the cluster when done to avoid ongoing charges.
 
-### Free account plan (important)
+### Free account plan
 
-New AWS accounts start on a **Free account plan** that only allows **Free Tier EC2 types** (e.g. `t3.micro`). Larger types like `t3.medium` or `m5.large` will fail with:
+New AWS accounts on the **Free account plan** only allow **t3.micro** instances. This repo uses **2 nodes** so pods can spread (one node is too small for EKS + full app).
 
-> *The specified instance type is not eligible for Free Tier*
+| Setting | Value |
+|---------|-------|
+| Instance | `t3.micro` |
+| Node count | **2** |
+| Public URL | LoadBalancer Service (no ALB controller pod) |
+| Postgres image | `postgres:16-alpine` |
 
-**Option A (default in this repo):** Use `t3.micro` — works on Free account plan. The install script removes `metrics-server`, scales CoreDNS to 1, and enables VPC CNI prefix delegation so the ALB controller can schedule (~5 pod slots needed).
+**After pulling these changes:** run **Destroy EKS** → **Provision EKS** → **CI/CD** (existing 1-node cluster cannot be resized in place).
 
-**Option B (recommended if add-ons or app pods still fail):** Upgrade to paid access so credits apply:
-1. AWS Console → **Billing and Cost Management**
-2. Look for **Free account plan** / **Upgrade** / activate full account access
-3. Change `k8s/eksctl.yaml` to `instanceTypes: ["t3.medium"]` and re-run **Provision EKS**
+Optional larger nodes (leave Free plan): use `k8s/eksctl-medium.yaml` (`t3.medium`, 1 node) after billing upgrade.
 
 ---
 

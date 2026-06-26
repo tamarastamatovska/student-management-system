@@ -24,10 +24,8 @@ DESIRED_SC="ebs-csi-gp3"
 if kubectl get statefulset postgres -n sms >/dev/null 2>&1; then
   STS_SC=$(kubectl get statefulset postgres -n sms \
     -o jsonpath='{.spec.volumeClaimTemplates[0].spec.storageClassName}' 2>/dev/null || echo "")
-  PVC_SC=$(kubectl get pvc postgres-data-postgres-0 -n sms \
-    -o jsonpath='{.spec.storageClassName}' 2>/dev/null || echo "")
-  if [ "${STS_SC}" != "${DESIRED_SC}" ] || [ "${PVC_SC}" != "${DESIRED_SC}" ]; then
-    echo "Recreating postgres (StorageClass migration: sts=${STS_SC:-empty}, pvc=${PVC_SC:-empty} -> ${DESIRED_SC})..."
+  if [ "${STS_SC}" != "${DESIRED_SC}" ]; then
+    echo "Recreating postgres (StatefulSet StorageClass: ${STS_SC:-empty} -> ${DESIRED_SC})..."
     kubectl delete statefulset postgres -n sms --ignore-not-found --wait=true --timeout=180s
     kubectl delete pvc postgres-data-postgres-0 -n sms --ignore-not-found --wait=true --timeout=180s
     kubectl delete pod postgres-0 -n sms --ignore-not-found --wait=true --timeout=60s 2>/dev/null || true
@@ -44,20 +42,20 @@ kubectl apply -f "${SCRIPT_DIR}/postgres/service.yaml"
 kubectl apply -f "${SCRIPT_DIR}/postgres/statefulset.yaml"
 
 echo "==> Waiting for postgres pod (PVC binds on schedule with WaitForFirstConsumer)..."
-kubectl rollout status statefulset/postgres -n sms --timeout=600s
+kubectl rollout status statefulset/postgres -n sms --timeout=900s
 
 echo "==> Applying backend..."
 kubectl apply -f "${SCRIPT_DIR}/backend/configmap.yaml"
 kubectl apply -f "${SCRIPT_DIR}/backend/service.yaml"
 envsubst < "${SCRIPT_DIR}/backend/deployment.yaml" | kubectl apply -f -
+kubectl rollout status deployment/backend -n sms --timeout=600s
 
 echo "==> Applying frontend..."
 kubectl apply -f "${SCRIPT_DIR}/frontend/configmap.yaml"
 kubectl apply -f "${SCRIPT_DIR}/frontend/service.yaml"
 envsubst < "${SCRIPT_DIR}/frontend/deployment.yaml" | kubectl apply -f -
 
-echo "==> Waiting for deployments..."
-kubectl rollout status deployment/backend -n sms --timeout=300s
+echo "==> Waiting for frontend..."
 kubectl rollout status deployment/frontend -n sms --timeout=300s
 
 echo ""

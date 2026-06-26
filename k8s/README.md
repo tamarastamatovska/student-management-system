@@ -73,7 +73,7 @@ Live URL appears in the deploy job **Summary**.
 | Backend `CrashLoopBackOff` | Wait for postgres; check logs |
 | PVC pending | Provision EKS installs EBS CSI driver |
 | CORS errors | Re-run CI/CD (CORS patched automatically) |
-| `Too many pods` on t3.micro | Run **Destroy EKS** then **Provision EKS** (recreates node with higher pod limit) |
+| `Too many pods` / `Insufficient memory` on t3.micro | Use **2× t3.micro** (`eksctl.yaml`); Destroy → Provision EKS |
 | Deploy auth errors | Same IAM user must have created the cluster |
 
 ## Tear down
