@@ -73,6 +73,10 @@ jobs:
           aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
           kubectl get nodes
           kubectl get pods -A --field-selector=status.phase!=Running,status.phase!=Succeeded 2>/dev/null || true
+          echo "=== EBS CSI addon ==="
+          aws eks describe-addon --cluster-name "$EKS_CLUSTER_NAME" --addon-name aws-ebs-csi-driver --region "$AWS_REGION" 2>/dev/null || true
+          kubectl get pods -n kube-system -l 'app.kubernetes.io/name=aws-ebs-csi-driver' -o wide 2>/dev/null || true
+          kubectl describe deployment ebs-csi-controller -n kube-system 2>/dev/null | tail -50 || true
 
       - name: Summary
         run: |

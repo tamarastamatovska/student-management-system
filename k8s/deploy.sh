@@ -18,7 +18,24 @@ export IMAGE_BACKEND IMAGE_FRONTEND
 echo "==> Ensuring EBS CSI StorageClass..."
 kubectl apply -f "${SCRIPT_DIR}/storageclass.yaml"
 
+echo "==> Verifying EBS CSI driver is ready..."
+if ! kubectl rollout status deployment/ebs-csi-controller -n kube-system --timeout=120s 2>/dev/null; then
+  echo "ERROR: EBS CSI controller not running. Re-run Provision EKS (install cluster add-ons step)."
+  kubectl get pods -n kube-system -l 'app.kubernetes.io/name=aws-ebs-csi-driver' 2>/dev/null || true
+  exit 1
+fi
+
 DESIRED_SC="ebs-csi-gp3"
+
+# Clean up failed deploy so postgres PVC/StatefulSet can be recreated.
+if kubectl get namespace sms >/dev/null 2>&1; then
+  PVC_PHASE=$(kubectl get pvc postgres-data-postgres-0 -n sms \
+    -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+  if [ "${PVC_PHASE}" = "Pending" ]; then
+    echo "Removing stuck sms namespace (PVC still Pending)..."
+    kubectl delete namespace sms --wait=true --timeout=180s
+  fi
+fi
 
 # StatefulSet volumeClaimTemplates are immutable — recreate postgres if StorageClass changed.
 if kubectl get statefulset postgres -n sms >/dev/null 2>&1; then

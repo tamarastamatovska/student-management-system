@@ -88,6 +88,23 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Verify EKS cluster exists
+        env:
+          EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          if ! aws eks describe-cluster --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
+            echo "::error::EKS cluster '$EKS_CLUSTER_NAME' not found in $AWS_REGION."
+            echo ""
+            echo "Run these workflows IN ORDER:"
+            echo "  1. Actions → Provision EKS → Run workflow (wait until green)"
+            echo "  2. Actions → CI/CD → Re-run all jobs"
+            echo ""
+            echo "If you just ran Destroy EKS, you must Provision EKS again before CI/CD."
+            exit 1
+          fi
+          echo "Cluster found."
+
       - name: Configure kubectl for EKS
         run: |
           aws eks update-kubeconfig \

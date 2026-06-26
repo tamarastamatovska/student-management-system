@@ -29,6 +29,9 @@ addons:
     configurationValues: |-
       replicaCount: 1
   - name: kube-proxy
+  - name: aws-ebs-csi-driver
+    wellKnownPolicies:
+      ebsCSIController: true
 
 managedNodeGroups:
   - name: sms-nodes
