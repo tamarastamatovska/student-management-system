@@ -18,15 +18,19 @@ export IMAGE_BACKEND IMAGE_FRONTEND
 echo "==> Ensuring EBS CSI StorageClass..."
 kubectl apply -f "${SCRIPT_DIR}/storageclass.yaml"
 
-# Redeploy after a failed run: PVC template is immutable; drop stuck namespace.
-if kubectl get namespace sms >/dev/null 2>&1; then
+DESIRED_SC="ebs-csi-gp3"
+
+# StatefulSet volumeClaimTemplates are immutable — recreate postgres if StorageClass changed.
+if kubectl get statefulset postgres -n sms >/dev/null 2>&1; then
+  STS_SC=$(kubectl get statefulset postgres -n sms \
+    -o jsonpath='{.spec.volumeClaimTemplates[0].spec.storageClassName}' 2>/dev/null || echo "")
   PVC_SC=$(kubectl get pvc postgres-data-postgres-0 -n sms \
     -o jsonpath='{.spec.storageClassName}' 2>/dev/null || echo "")
-  PVC_PHASE=$(kubectl get pvc postgres-data-postgres-0 -n sms \
-    -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
-  if [ "${PVC_PHASE}" = "Pending" ] && [ "${PVC_SC}" != "ebs-csi-gp3" ]; then
-    echo "Removing stuck sms namespace (PVC StorageClass=${PVC_SC:-empty}, phase=${PVC_PHASE})..."
-    kubectl delete namespace sms --wait=true --timeout=180s
+  if [ "${STS_SC}" != "${DESIRED_SC}" ] || [ "${PVC_SC}" != "${DESIRED_SC}" ]; then
+    echo "Recreating postgres (StorageClass migration: sts=${STS_SC:-empty}, pvc=${PVC_SC:-empty} -> ${DESIRED_SC})..."
+    kubectl delete statefulset postgres -n sms --ignore-not-found --wait=true --timeout=180s
+    kubectl delete pvc postgres-data-postgres-0 -n sms --ignore-not-found --wait=true --timeout=180s
+    kubectl delete pod postgres-0 -n sms --ignore-not-found --wait=true --timeout=60s 2>/dev/null || true
   fi
 fi
 
