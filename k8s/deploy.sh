@@ -15,6 +15,21 @@ fi
 
 export IMAGE_BACKEND IMAGE_FRONTEND
 
+echo "==> Ensuring EBS CSI StorageClass..."
+kubectl apply -f "${SCRIPT_DIR}/storageclass.yaml"
+
+# Redeploy after a failed run: PVC template is immutable; drop stuck namespace.
+if kubectl get namespace sms >/dev/null 2>&1; then
+  PVC_SC=$(kubectl get pvc postgres-data-postgres-0 -n sms \
+    -o jsonpath='{.spec.storageClassName}' 2>/dev/null || echo "")
+  PVC_PHASE=$(kubectl get pvc postgres-data-postgres-0 -n sms \
+    -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+  if [ "${PVC_PHASE}" = "Pending" ] && [ "${PVC_SC}" != "ebs-csi-gp3" ]; then
+    echo "Removing stuck sms namespace (PVC StorageClass=${PVC_SC:-empty}, phase=${PVC_PHASE})..."
+    kubectl delete namespace sms --wait=true --timeout=180s
+  fi
+fi
+
 echo "==> Applying namespace..."
 kubectl apply -f "${SCRIPT_DIR}/namespace.yaml"
 
@@ -24,23 +39,7 @@ kubectl apply -f "${SCRIPT_DIR}/postgres/configmap.yaml"
 kubectl apply -f "${SCRIPT_DIR}/postgres/service.yaml"
 kubectl apply -f "${SCRIPT_DIR}/postgres/statefulset.yaml"
 
-echo "==> Waiting for postgres PVC..."
-for i in $(seq 1 60); do
-  PHASE=$(kubectl get pvc postgres-data-postgres-0 -n sms -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
-  if [ "$PHASE" = "Bound" ]; then
-    echo "PVC bound."
-    break
-  fi
-  if [ "$i" -eq 60 ]; then
-    echo "PVC not bound after 5 minutes:"
-    kubectl describe pvc postgres-data-postgres-0 -n sms || true
-    kubectl get storageclass || true
-    exit 1
-  fi
-  sleep 5
-done
-
-echo "==> Waiting for postgres pod..."
+echo "==> Waiting for postgres pod (PVC binds on schedule with WaitForFirstConsumer)..."
 kubectl rollout status statefulset/postgres -n sms --timeout=600s
 
 echo "==> Applying backend..."

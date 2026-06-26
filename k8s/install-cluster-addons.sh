@@ -26,14 +26,10 @@ eksctl create addon \
   --region "${AWS_REGION}" \
   --force
 
-echo "==> Waiting for default StorageClass..."
-for i in $(seq 1 30); do
-  if kubectl get storageclass 2>/dev/null | grep -q '(default)'; then
-    kubectl get storageclass
-    break
-  fi
-  sleep 10
-done
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "==> Applying EBS CSI StorageClass..."
+kubectl apply -f "${SCRIPT_DIR}/storageclass.yaml"
+kubectl get storageclass
 
 echo "==> Add-ons installed."
 echo "Public URL will come from frontend LoadBalancer Service (no in-cluster ALB controller needed)."

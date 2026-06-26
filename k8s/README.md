@@ -32,13 +32,14 @@ On `t3.micro` (Free Tier), we use a **LoadBalancer Service** instead of ALB Ingr
 | `postgres/secret.yaml` | Secret | DB credentials |
 | `postgres/configmap.yaml` | ConfigMap | Postgres config |
 | `postgres/service.yaml` | Headless Service | Stable DNS for StatefulSet |
-| `postgres/statefulset.yaml` | StatefulSet | PostgreSQL 16 + EBS PVC (gp2) |
+| `postgres/statefulset.yaml` | StatefulSet | PostgreSQL 16 + EBS PVC (ebs-csi-gp3) |
 | `backend/configmap.yaml` | ConfigMap | Datasource URL, CORS |
 | `backend/service.yaml` | ClusterIP Service | Internal API :8080 |
 | `backend/deployment.yaml` | Deployment | Spring Boot app |
 | `frontend/configmap.yaml` | ConfigMap | nginx.conf with /api proxy |
 | `frontend/service.yaml` | LoadBalancer Service | Public HTTP URL |
 | `frontend/deployment.yaml` | Deployment | React static + nginx |
+| `storageclass.yaml` | StorageClass | EBS CSI gp3 (default) |
 | `ingress.yaml` | Ingress (ALB) | Optional — requires ALB controller + larger nodes |
 | `eksctl.yaml` | eksctl config | Standard AWS cluster (any region via secrets) |
 | `eksctl-educate.yaml` | eksctl config | Educate-only fallback (`us-east-1`) |
