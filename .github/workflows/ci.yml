@@ -106,36 +106,36 @@ jobs:
           chmod +x k8s/deploy.sh
           ./k8s/deploy.sh
 
-      - name: Wait for ALB and patch CORS
+      - name: Wait for LoadBalancer and patch CORS
         run: |
-          echo "Waiting for ALB hostname (up to 5 minutes)..."
-          ALB=""
+          echo "Waiting for frontend LoadBalancer hostname (up to 5 minutes)..."
+          LB=""
           for _ in $(seq 1 30); do
-            ALB=$(kubectl get ingress sms-ingress -n sms \
+            LB=$(kubectl get svc frontend -n sms \
               -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
-            if [ -n "$ALB" ]; then
+            if [ -n "$LB" ]; then
               break
             fi
             sleep 10
           done
 
-          if [ -z "$ALB" ]; then
-            echo "::warning::ALB hostname not ready yet. Check ingress later with kubectl."
-            kubectl get ingress sms-ingress -n sms || true
+          if [ -z "$LB" ]; then
+            echo "::warning::LoadBalancer hostname not ready yet. Check: kubectl get svc frontend -n sms"
+            kubectl get svc frontend -n sms || true
             exit 0
           fi
 
-          echo "ALB hostname: $ALB"
+          echo "LoadBalancer hostname: $LB"
           kubectl patch configmap backend-config -n sms --type merge \
-            -p "{\"data\":{\"CORS_ALLOWED_ORIGINS\":\"http://localhost,http://localhost:5173,http://${ALB}\"}}"
+            -p "{\"data\":{\"CORS_ALLOWED_ORIGINS\":\"http://localhost,http://localhost:5173,http://${LB}\"}}"
           kubectl rollout restart deployment/backend -n sms
           kubectl rollout status deployment/backend -n sms --timeout=180s
 
           echo "## Deployment live" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "**App URL:** http://${ALB}" >> "$GITHUB_STEP_SUMMARY"
+          echo "**App URL:** http://${LB}" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "**API test:** http://${ALB}/api/students/stats" >> "$GITHUB_STEP_SUMMARY"
+          echo "**API test:** http://${LB}/api/students/stats" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Show cluster resources
-        run: kubectl get all,ingress,pvc -n sms
+        run: kubectl get all,pvc -n sms

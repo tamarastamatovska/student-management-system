@@ -37,18 +37,15 @@ kubectl apply -f "${SCRIPT_DIR}/frontend/configmap.yaml"
 kubectl apply -f "${SCRIPT_DIR}/frontend/service.yaml"
 envsubst < "${SCRIPT_DIR}/frontend/deployment.yaml" | kubectl apply -f -
 
-echo "==> Applying ingress..."
-kubectl apply -f "${SCRIPT_DIR}/ingress.yaml"
-
 echo "==> Waiting for deployments..."
 kubectl rollout status deployment/backend -n sms --timeout=300s
 kubectl rollout status deployment/frontend -n sms --timeout=300s
 
 echo ""
 echo "==> Deploy complete. Resources in namespace sms:"
-kubectl get all,ingress,pvc -n sms
+kubectl get all,pvc -n sms
 
 echo ""
-echo "ALB URL (may take 2-3 minutes to appear):"
-kubectl get ingress sms-ingress -n sms -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "(pending)"
+echo "Public URL (may take 2-3 minutes to appear):"
+kubectl get svc frontend -n sms -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "(pending)"
 echo ""

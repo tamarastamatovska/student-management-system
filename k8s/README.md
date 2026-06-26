@@ -9,10 +9,12 @@ For AWS Educate Starter / classroom accounts only: **[AWS-EDUCATE.md](AWS-EDUCAT
 ## Architecture
 
 ```
-Internet → ALB (Ingress) → frontend Service → frontend Pods (nginx)
-                                    ↓ /api proxy
-                              backend Service → backend Pods → postgres StatefulSet
+Internet → AWS LoadBalancer → frontend Service (LoadBalancer) → frontend Pods (nginx)
+                                        ↓ /api proxy
+                                  backend Service → backend Pods → postgres StatefulSet
 ```
+
+On `t3.micro` (Free Tier), we use a **LoadBalancer Service** instead of ALB Ingress — no in-cluster ALB controller pod needed. See `ingress.yaml` for optional ALB Ingress on larger clusters.
 
 ## GitHub Actions workflows
 
@@ -35,12 +37,12 @@ Internet → ALB (Ingress) → frontend Service → frontend Pods (nginx)
 | `backend/service.yaml` | ClusterIP Service | Internal API :8080 |
 | `backend/deployment.yaml` | Deployment | Spring Boot app |
 | `frontend/configmap.yaml` | ConfigMap | nginx.conf with /api proxy |
-| `frontend/service.yaml` | ClusterIP Service | Internal UI :80 |
+| `frontend/service.yaml` | LoadBalancer Service | Public HTTP URL |
 | `frontend/deployment.yaml` | Deployment | React static + nginx |
-| `ingress.yaml` | Ingress (ALB) | Public HTTP access |
+| `ingress.yaml` | Ingress (ALB) | Optional — requires ALB controller + larger nodes |
 | `eksctl.yaml` | eksctl config | Standard AWS cluster (any region via secrets) |
 | `eksctl-educate.yaml` | eksctl config | Educate-only fallback (`us-east-1`) |
-| `install-cluster-addons.sh` | Script | EBS CSI + ALB controller |
+| `install-cluster-addons.sh` | Script | EBS CSI driver only |
 
 ## Required GitHub Secrets
 
@@ -66,10 +68,11 @@ Live URL appears in the deploy job **Summary**.
 | Issue | Fix |
 |-------|-----|
 | `ImagePullBackOff` | Make Docker Hub images public |
-| Ingress has no ADDRESS | Run Provision EKS; wait 2–5 min |
+| Ingress has no ADDRESS | Wait for frontend LoadBalancer: `kubectl get svc frontend -n sms` |
 | Backend `CrashLoopBackOff` | Wait for postgres; check logs |
 | PVC pending | Provision EKS installs EBS CSI driver |
 | CORS errors | Re-run CI/CD (CORS patched automatically) |
+| `Too many pods` on t3.micro | Run **Destroy EKS** then **Provision EKS** (recreates node with higher pod limit) |
 | Deploy auth errors | Same IAM user must have created the cluster |
 
 ## Tear down

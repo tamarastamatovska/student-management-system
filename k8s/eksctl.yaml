@@ -38,6 +38,7 @@ addons:
 managedNodeGroups:
   - name: sms-nodes
     instanceTypes: ["t3.micro"]
+    maxPodsPerNode: 110
     desiredCapacity: 1
     minSize: 1
     maxSize: 1
