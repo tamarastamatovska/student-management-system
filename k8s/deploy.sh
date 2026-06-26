@@ -26,6 +26,14 @@ if ! kubectl rollout status deployment/ebs-csi-controller -n kube-system --timeo
 fi
 
 DESIRED_SC="ebs-csi-gp3"
+DESIRED_SIZE=$(grep 'storage:' "${SCRIPT_DIR}/postgres/statefulset.yaml" | tail -1 | awk '{print $2}')
+
+recreate_postgres() {
+  echo "$1"
+  kubectl delete statefulset postgres -n sms --ignore-not-found --wait=true --timeout=180s
+  kubectl delete pvc postgres-data-postgres-0 -n sms --ignore-not-found --wait=true --timeout=180s
+  kubectl delete pod postgres-0 -n sms --ignore-not-found --wait=true --timeout=60s 2>/dev/null || true
+}
 
 # Clean up failed deploy so postgres PVC/StatefulSet can be recreated.
 if kubectl get namespace sms >/dev/null 2>&1; then
@@ -37,15 +45,14 @@ if kubectl get namespace sms >/dev/null 2>&1; then
   fi
 fi
 
-# StatefulSet volumeClaimTemplates are immutable — recreate postgres if StorageClass changed.
+# StatefulSet volumeClaimTemplates are immutable — recreate postgres if claim spec changed.
 if kubectl get statefulset postgres -n sms >/dev/null 2>&1; then
   STS_SC=$(kubectl get statefulset postgres -n sms \
     -o jsonpath='{.spec.volumeClaimTemplates[0].spec.storageClassName}' 2>/dev/null || echo "")
-  if [ "${STS_SC}" != "${DESIRED_SC}" ]; then
-    echo "Recreating postgres (StatefulSet StorageClass: ${STS_SC:-empty} -> ${DESIRED_SC})..."
-    kubectl delete statefulset postgres -n sms --ignore-not-found --wait=true --timeout=180s
-    kubectl delete pvc postgres-data-postgres-0 -n sms --ignore-not-found --wait=true --timeout=180s
-    kubectl delete pod postgres-0 -n sms --ignore-not-found --wait=true --timeout=60s 2>/dev/null || true
+  STS_SIZE=$(kubectl get statefulset postgres -n sms \
+    -o jsonpath='{.spec.volumeClaimTemplates[0].spec.resources.requests.storage}' 2>/dev/null || echo "")
+  if [ "${STS_SC}" != "${DESIRED_SC}" ] || [ "${STS_SIZE}" != "${DESIRED_SIZE}" ]; then
+    recreate_postgres "Recreating postgres (volumeClaim: ${STS_SC:-empty}/${STS_SIZE:-empty} -> ${DESIRED_SC}/${DESIRED_SIZE})..."
   fi
 fi
 
@@ -56,7 +63,14 @@ echo "==> Applying postgres (Secret, ConfigMap, Service, StatefulSet)..."
 kubectl apply -f "${SCRIPT_DIR}/postgres/secret.yaml"
 kubectl apply -f "${SCRIPT_DIR}/postgres/configmap.yaml"
 kubectl apply -f "${SCRIPT_DIR}/postgres/service.yaml"
-kubectl apply -f "${SCRIPT_DIR}/postgres/statefulset.yaml"
+if ! kubectl apply -f "${SCRIPT_DIR}/postgres/statefulset.yaml" 2>&1 | tee /tmp/postgres-sts-apply.log; then
+  if grep -q Forbidden /tmp/postgres-sts-apply.log; then
+    recreate_postgres "Recreating postgres (StatefulSet has immutable spec changes)..."
+    kubectl apply -f "${SCRIPT_DIR}/postgres/statefulset.yaml"
+  else
+    exit 1
+  fi
+fi
 
 echo "==> Waiting for postgres pod (PVC binds on schedule with WaitForFirstConsumer)..."
 kubectl rollout status statefulset/postgres -n sms --timeout=900s
