@@ -20,11 +20,21 @@ spec:
           ports:
             - containerPort: 5432
               name: postgres
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           envFrom:
             - secretRef:
                 name: postgres-secret
             - configMapRef:
                 name: postgres-config
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
@@ -54,7 +64,6 @@ spec:
       spec:
         accessModes:
           - ReadWriteOnce
-        storageClassName: gp2
         resources:
           requests:
             storage: 5Gi

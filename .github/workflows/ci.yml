@@ -106,6 +106,14 @@ jobs:
           chmod +x k8s/deploy.sh
           ./k8s/deploy.sh
 
+      - name: Dump deploy errors on failure
+        if: failure()
+        run: |
+          kubectl get nodes
+          kubectl get pods,pvc,events -n sms --sort-by='.lastTimestamp' 2>/dev/null || true
+          kubectl describe pod -l app=postgres -n sms 2>/dev/null | tail -60 || true
+          kubectl describe pvc -n sms 2>/dev/null | tail -40 || true
+
       - name: Wait for LoadBalancer and patch CORS
         run: |
           echo "Waiting for frontend LoadBalancer hostname (up to 5 minutes)..."

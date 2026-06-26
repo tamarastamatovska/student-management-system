@@ -24,8 +24,24 @@ kubectl apply -f "${SCRIPT_DIR}/postgres/configmap.yaml"
 kubectl apply -f "${SCRIPT_DIR}/postgres/service.yaml"
 kubectl apply -f "${SCRIPT_DIR}/postgres/statefulset.yaml"
 
+echo "==> Waiting for postgres PVC..."
+for i in $(seq 1 60); do
+  PHASE=$(kubectl get pvc postgres-data-postgres-0 -n sms -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+  if [ "$PHASE" = "Bound" ]; then
+    echo "PVC bound."
+    break
+  fi
+  if [ "$i" -eq 60 ]; then
+    echo "PVC not bound after 5 minutes:"
+    kubectl describe pvc postgres-data-postgres-0 -n sms || true
+    kubectl get storageclass || true
+    exit 1
+  fi
+  sleep 5
+done
+
 echo "==> Waiting for postgres pod..."
-kubectl rollout status statefulset/postgres -n sms --timeout=300s
+kubectl rollout status statefulset/postgres -n sms --timeout=600s
 
 echo "==> Applying backend..."
 kubectl apply -f "${SCRIPT_DIR}/backend/configmap.yaml"
