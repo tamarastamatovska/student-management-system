@@ -132,6 +132,8 @@ jobs:
           kubectl describe pvc -n sms 2>/dev/null | tail -40 || true
 
       - name: Wait for LoadBalancer and patch CORS
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           echo "Waiting for frontend LoadBalancer hostname (up to 5 minutes)..."
           LB=""
@@ -150,7 +152,12 @@ jobs:
             exit 0
           fi
 
-          echo "LoadBalancer hostname: $LB"
+          # GitHub masks secret values in logs; ELB hostnames include AWS_REGION.
+          LB_DISPLAY=$(echo "$LB" | sed "s/${AWS_REGION}/<region>/g")
+          echo "LoadBalancer hostname: ${LB_DISPLAY}"
+          echo "App URL: http://${LB_DISPLAY}"
+          echo "(replace <region> with your AWS_REGION secret value)"
+
           kubectl patch configmap backend-config -n sms --type merge \
             -p "{\"data\":{\"CORS_ALLOWED_ORIGINS\":\"http://localhost,http://localhost:5173,http://${LB}\"}}"
           kubectl rollout restart deployment/backend -n sms
@@ -158,9 +165,11 @@ jobs:
 
           echo "## Deployment live" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "**App URL:** http://${LB}" >> "$GITHUB_STEP_SUMMARY"
+          echo "**App URL:** http://${LB_DISPLAY}" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "**API test:** http://${LB}/api/students/stats" >> "$GITHUB_STEP_SUMMARY"
+          echo "**API test:** http://${LB_DISPLAY}/api/students/stats" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "_Replace \`<region>\` in the hostname with your \`AWS_REGION\` repository secret._" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Show cluster resources
         run: kubectl get all,pvc -n sms
