@@ -155,18 +155,11 @@ jobs:
             exit 0
           fi
 
-          ELB_PREFIX="${LB%%.*}"
-          APP_URL="http://${ELB_PREFIX}.${AWS_REGION}.elb.amazonaws.com/"
+          APP_URL="http://${LB}/"
           APP_URL_API="${APP_URL}api/students/stats"
 
-          # GitHub redacts Secret values in job summaries. HTML-encode the region so the
-          # summary renders a normal URL but the raw text does not match the secret.
-          REGION_SUMMARY=$(echo "$AWS_REGION" | sed 's/-/&#45;/g')
-          SUMMARY_APP_URL="http://${ELB_PREFIX}.${REGION_SUMMARY}.elb.amazonaws.com/"
-          SUMMARY_API_URL="http://${ELB_PREFIX}.${REGION_SUMMARY}.elb.amazonaws.com/api/students/stats"
-
           kubectl patch configmap backend-config -n sms --type merge \
-            -p "{\"data\":{\"CORS_ALLOWED_ORIGINS\":\"http://localhost,http://localhost:5173,http://${ELB_PREFIX}.${AWS_REGION}.elb.amazonaws.com\"}}"
+            -p "{\"data\":{\"CORS_ALLOWED_ORIGINS\":\"http://localhost,http://localhost:5173,http://${LB}\"}}"
           kubectl rollout restart deployment/backend -n sms
           kubectl rollout status deployment/backend -n sms --timeout=180s
 
@@ -174,18 +167,24 @@ jobs:
           echo "url_ready=true" >> "$GITHUB_OUTPUT"
           echo "app_url=${APP_URL}" >> "$GITHUB_OUTPUT"
 
+      - name: Write deployment summary
+        if: steps.deploy-url.outputs.url_ready == 'true'
+        run: |
           {
             echo "## Deployment live"
             echo ""
-            echo "Copy into your browser **address bar** (not Google search):"
+            echo "### Copy/paste URL"
             echo ""
-            echo "${SUMMARY_APP_URL}"
+            echo "GitHub redacts \`AWS_REGION\` in job summaries when it is a Secret, so the URL cannot be shown here reliably."
             echo ""
-            echo "**API test:**"
+            echo "**Use one of these instead:**"
             echo ""
-            echo "${SUMMARY_API_URL}"
+            echo "1. **View deployment** — click the link at the top of this workflow run"
+            echo "2. **Artifacts** → \`deployment-url\` → open \`deployment-url.txt\` → copy line 1 into your browser address bar"
             echo ""
-            echo "Or use **View deployment** (top of this workflow run) for a direct link."
+            echo "### API test"
+            echo ""
+            echo "Same as above, but use line 2 from \`deployment-url.txt\` (ends with \`/api/students/stats\`)."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload deployment URL
