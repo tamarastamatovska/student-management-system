@@ -169,23 +169,28 @@ jobs:
 
       - name: Write deployment summary
         if: steps.deploy-url.outputs.url_ready == 'true'
-        run: |
-          {
-            echo "## Deployment live"
-            echo ""
-            echo "### Copy/paste URL"
-            echo ""
-            echo "GitHub redacts \`AWS_REGION\` in job summaries when it is a Secret, so the URL cannot be shown here reliably."
-            echo ""
-            echo "**Use one of these instead:**"
-            echo ""
-            echo "1. **View deployment** — click the link at the top of this workflow run"
-            echo "2. **Artifacts** → \`deployment-url\` → open \`deployment-url.txt\` → copy line 1 into your browser address bar"
-            echo ""
-            echo "### API test"
-            echo ""
-            echo "Same as above, but use line 2 from \`deployment-url.txt\` (ends with \`/api/students/stats\`)."
-          } >> "$GITHUB_STEP_SUMMARY"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const lines = fs.readFileSync('deployment-url.txt', 'utf8').trim().split('\n');
+            const appUrl = lines[0];
+            const apiUrl = lines[1] || `${appUrl}api/students/stats`;
+            await core.summary
+              .addHeading('Deployment live', 2)
+              .addRaw('Copy into your browser **address bar** (not Google search):')
+              .addBreak()
+              .addCodeBlock(appUrl, 'text')
+              .addBreak()
+              .addRaw('**API test:**')
+              .addBreak()
+              .addCodeBlock(apiUrl, 'text')
+              .addBreak()
+              .addRaw('Or click: ')
+              .addLink('Open app', appUrl)
+              .addRaw(' · ')
+              .addLink('API test', apiUrl)
+              .write();
 
       - name: Upload deployment URL
         if: steps.deploy-url.outputs.url_ready == 'true'
