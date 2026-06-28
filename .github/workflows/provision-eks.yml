@@ -16,7 +16,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION || secrets.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Install eksctl
         run: |
@@ -30,7 +30,7 @@ jobs:
       - name: Create EKS cluster
         env:
           EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
-          AWS_REGION: ${{ vars.AWS_REGION || secrets.AWS_REGION }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           sudo apt-get update && sudo apt-get install -y gettext-base
           chmod +x k8s/provision-cluster.sh
@@ -40,7 +40,7 @@ jobs:
         if: failure()
         env:
           EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
-          AWS_REGION: ${{ vars.AWS_REGION || secrets.AWS_REGION }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           for stack in "eksctl-${EKS_CLUSTER_NAME}-nodegroup-sms-nodes" "eksctl-${EKS_CLUSTER_NAME}-cluster"; do
             echo "=== ${stack} ==="
@@ -53,13 +53,13 @@ jobs:
         run: |
           aws eks update-kubeconfig \
             --name "${{ secrets.EKS_CLUSTER_NAME }}" \
-            --region "${{ vars.AWS_REGION || secrets.AWS_REGION }}"
+            --region "${{ secrets.AWS_REGION }}"
           kubectl get nodes
 
       - name: Install cluster add-ons
         env:
           EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
-          AWS_REGION: ${{ vars.AWS_REGION || secrets.AWS_REGION }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           chmod +x k8s/install-cluster-addons.sh
           ./k8s/install-cluster-addons.sh
@@ -68,7 +68,7 @@ jobs:
         if: failure()
         env:
           EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
-          AWS_REGION: ${{ vars.AWS_REGION || secrets.AWS_REGION }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
           kubectl get nodes
@@ -82,6 +82,6 @@ jobs:
         run: |
           echo "## EKS cluster ready" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Cluster: \`${{ secrets.EKS_CLUSTER_NAME }}\` in \`${{ vars.AWS_REGION || secrets.AWS_REGION }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Cluster: \`${{ secrets.EKS_CLUSTER_NAME }}\` in \`${{ secrets.AWS_REGION }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Push to \`main\` to deploy the app via the **CI/CD** workflow." >> "$GITHUB_STEP_SUMMARY"

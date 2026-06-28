@@ -112,9 +112,7 @@ On **push to main** only:
 4. Deploy to EKS (namespace `sms`) via `k8s/deploy.sh`
 5. Patch CORS and print live URL in job Summary
 
-### Required GitHub configuration
-
-**Secrets** (Settings → Actions → Secrets):
+### Required GitHub Secrets
 
 | Secret | Description |
 |--------|-------------|
@@ -122,20 +120,15 @@ On **push to main** only:
 | `DOCKERHUB_TOKEN` | Docker Hub access token |
 | `AWS_ACCESS_KEY_ID` | IAM key for EKS (same user that provisions cluster) |
 | `AWS_SECRET_ACCESS_KEY` | IAM secret for EKS |
+| `AWS_REGION` | `eu-north-1` (Europe Stockholm) |
 | `EKS_CLUSTER_NAME` | `sms-cluster` |
-
-**Variables** (Settings → Actions → Variables):
-
-| Variable | Description |
-|----------|-------------|
-| `AWS_REGION` | `eu-north-1` (Europe Stockholm) — use a **variable**, not a secret, so deploy URLs appear correctly in CI summaries |
 
 ### First-time AWS setup
 
 Step-by-step guide: **[k8s/AWS-SETUP.md](k8s/AWS-SETUP.md)**
 
 1. Create IAM user `github-actions` + access keys in AWS Console
-2. Add GitHub Secrets and the `AWS_REGION` **variable** (see [k8s/AWS-SETUP.md](k8s/AWS-SETUP.md))
+2. Add GitHub Secrets (`AWS_REGION=eu-north-1`)
 3. Run **Provision EKS** workflow once
 4. Push to `main` — app deploys automatically
 

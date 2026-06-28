@@ -53,13 +53,9 @@ You're in the AWS Console — that's what you need. Keep your region as **Europe
 
 ---
 
-## Step 3 — Add GitHub Secrets and Variables
+## Step 3 — Add GitHub Secrets
 
-Repo → **Settings** → **Secrets and variables** → **Actions**
-
-### Repository secrets
-
-**New repository secret** — add these:
+Repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
 
 | Secret | Value |
 |--------|-------|
@@ -67,19 +63,8 @@ Repo → **Settings** → **Secrets and variables** → **Actions**
 | `DOCKERHUB_TOKEN` | Docker Hub access token |
 | `AWS_ACCESS_KEY_ID` | From Step 2 |
 | `AWS_SECRET_ACCESS_KEY` | From Step 2 |
-| `EKS_CLUSTER_NAME` | `sms-cluster` |
-
-### Repository variables
-
-Open the **Variables** tab → **New repository variable**:
-
-| Variable | Value |
-|----------|-------|
 | `AWS_REGION` | `eu-north-1` |
-
-Store the region as a **variable**, not a secret. GitHub redacts secret values in job summaries, which breaks LoadBalancer URLs (`..elb.amazonaws.com`). Variables are not redacted, so deploy summaries show the full clickable URL automatically.
-
-If you already added `AWS_REGION` as a secret, delete that secret after creating the variable (same value).
+| `EKS_CLUSTER_NAME` | `sms-cluster` |
 
 ---
 
