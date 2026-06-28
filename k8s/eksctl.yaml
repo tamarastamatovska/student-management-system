@@ -19,6 +19,10 @@ iam:
 autoModeConfig:
   enabled: false
 
+# Prevent eksctl ≥0.201 from auto-installing metrics-server (too heavy for 2× t3.micro).
+addonsConfig:
+  disableDefaultAddons: true
+
 addons:
   - name: vpc-cni
     configurationValues: |-
