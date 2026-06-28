@@ -77,6 +77,8 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || secrets.AWS_REGION }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -86,12 +88,11 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION || secrets.AWS_REGION }}
 
       - name: Verify EKS cluster exists
         env:
           EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           if ! aws eks describe-cluster --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
             echo "::error::EKS cluster '$EKS_CLUSTER_NAME' not found in $AWS_REGION."
@@ -109,7 +110,7 @@ jobs:
         run: |
           aws eks update-kubeconfig \
             --name "${{ secrets.EKS_CLUSTER_NAME }}" \
-            --region "${{ secrets.AWS_REGION }}"
+            --region "${{ vars.AWS_REGION || secrets.AWS_REGION }}"
           kubectl cluster-info
 
       - name: Install envsubst
@@ -132,8 +133,7 @@ jobs:
           kubectl describe pvc -n sms 2>/dev/null | tail -40 || true
 
       - name: Wait for LoadBalancer and patch CORS
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION }}
+        id: deploy-url
         run: |
           echo "Waiting for frontend LoadBalancer hostname (up to 5 minutes)..."
           LB=""
@@ -152,24 +152,37 @@ jobs:
             exit 0
           fi
 
-          # GitHub masks secret values in logs; ELB hostnames include AWS_REGION.
-          LB_DISPLAY=$(echo "$LB" | sed "s/${AWS_REGION}/<region>/g")
-          echo "LoadBalancer hostname: ${LB_DISPLAY}"
-          echo "App URL: http://${LB_DISPLAY}"
-          echo "(replace <region> with your AWS_REGION secret value)"
+          APP_URL="http://${LB}"
+          APP_URL_API="${APP_URL}/api/students/stats"
+
+          echo "App URL: ${APP_URL}"
+          echo "API test: ${APP_URL_API}"
 
           kubectl patch configmap backend-config -n sms --type merge \
             -p "{\"data\":{\"CORS_ALLOWED_ORIGINS\":\"http://localhost,http://localhost:5173,http://${LB}\"}}"
           kubectl rollout restart deployment/backend -n sms
           kubectl rollout status deployment/backend -n sms --timeout=180s
 
-          echo "## Deployment live" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "**App URL:** http://${LB_DISPLAY}" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "**API test:** http://${LB_DISPLAY}/api/students/stats" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "_Replace \`<region>\` in the hostname with your \`AWS_REGION\` repository secret._" >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n%s\n' "$APP_URL" "$APP_URL_API" > deployment-url.txt
+          echo "url_ready=true" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Deployment live"
+            echo ""
+            echo "**App URL:** ${APP_URL}"
+            echo ""
+            echo "**API test:** ${APP_URL_API}"
+            echo ""
+            echo "_Full URLs are also in the \`deployment-url\` artifact (Artifacts tab)._"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload deployment URL
+        if: steps.deploy-url.outputs.url_ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-url
+          path: deployment-url.txt
+          retention-days: 30
 
       - name: Show cluster resources
         run: kubectl get all,pvc -n sms

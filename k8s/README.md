@@ -45,7 +45,9 @@ On `t3.micro` (Free Tier), we use a **LoadBalancer Service** instead of ALB Ingr
 | `eksctl-educate.yaml` | eksctl config | Educate-only fallback (`us-east-1`) |
 | `install-cluster-addons.sh` | Script | EBS CSI driver only |
 
-## Required GitHub Secrets
+## Required GitHub configuration
+
+**Secrets**
 
 | Secret | Example |
 |--------|---------|
@@ -53,12 +55,17 @@ On `t3.micro` (Free Tier), we use a **LoadBalancer Service** instead of ALB Ingr
 | `DOCKERHUB_TOKEN` | Docker Hub access token |
 | `AWS_ACCESS_KEY_ID` | IAM access key |
 | `AWS_SECRET_ACCESS_KEY` | IAM secret key |
-| `AWS_REGION` | `eu-north-1` |
 | `EKS_CLUSTER_NAME` | `sms-cluster` |
+
+**Variables**
+
+| Variable | Example |
+|----------|---------|
+| `AWS_REGION` | `eu-north-1` |
 
 ## One-time setup
 
-1. Add GitHub Secrets (see table above)
+1. Add GitHub Secrets and Variables (see table above)
 2. Run **Provision EKS** workflow in Actions tab
 3. Push to `main` — **CI/CD** deploys automatically
 
