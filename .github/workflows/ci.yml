@@ -80,22 +80,32 @@ jobs:
     environment:
       name: sms
       url: ${{ steps.deploy-url.outputs.app_url }}
-    env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Resolve AWS region
+        id: aws-region
+        env:
+          AWS_REGION_SECRET: ${{ secrets.AWS_REGION }}
+        run: |
+          region=$(bash .github/scripts/resolve-aws-region.sh)
+          echo "region=${region}" >> "$GITHUB_OUTPUT"
+          if printf '%s' "$AWS_REGION_SECRET" | grep -qE '^[a-z]{2}(-gov)?-[a-z]+-[0-9]+$'; then
+            echo "::warning::AWS_REGION is plain text — deploy summary URLs will show ***. Update the secret to base64: echo -n 'YOUR-REGION' | base64"
+          fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ steps.aws-region.outputs.region }}
 
       - name: Verify EKS cluster exists
         env:
           EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+          AWS_REGION: ${{ steps.aws-region.outputs.region }}
         run: |
           if ! aws eks describe-cluster --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
             echo "::error::EKS cluster '$EKS_CLUSTER_NAME' not found in $AWS_REGION."
@@ -113,7 +123,7 @@ jobs:
         run: |
           aws eks update-kubeconfig \
             --name "${{ secrets.EKS_CLUSTER_NAME }}" \
-            --region "${{ secrets.AWS_REGION }}"
+            --region "${{ steps.aws-region.outputs.region }}"
           kubectl cluster-info
 
       - name: Install envsubst
@@ -166,16 +176,18 @@ jobs:
           printf '%s\n%s\n' "$APP_URL" "$APP_URL_API" > deployment-url.txt
           echo "url_ready=true" >> "$GITHUB_OUTPUT"
           echo "app_url=${APP_URL}" >> "$GITHUB_OUTPUT"
+          echo "elb_prefix=${LB%%.*}" >> "$GITHUB_OUTPUT"
 
       - name: Write deployment summary
         if: steps.deploy-url.outputs.url_ready == 'true'
         uses: actions/github-script@v7
+        env:
+          ELB_PREFIX: ${{ steps.deploy-url.outputs.elb_prefix }}
+          AWS_REGION: ${{ steps.aws-region.outputs.region }}
         with:
           script: |
-            const fs = require('fs');
-            const lines = fs.readFileSync('deployment-url.txt', 'utf8').trim().split('\n');
-            const appUrl = lines[0];
-            const apiUrl = lines[1] || `${appUrl}api/students/stats`;
+            const appUrl = `http://${process.env.ELB_PREFIX}.${process.env.AWS_REGION}.elb.amazonaws.com/`;
+            const apiUrl = `${appUrl}api/students/stats`;
             await core.summary
               .addHeading('Deployment live', 2)
               .addRaw('Copy into your browser **address bar** (not Google search):')

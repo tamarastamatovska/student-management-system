@@ -63,8 +63,17 @@ Repo → **Settings** → **Secrets and variables** → **Actions** → **New re
 | `DOCKERHUB_TOKEN` | Docker Hub access token |
 | `AWS_ACCESS_KEY_ID` | From Step 2 |
 | `AWS_SECRET_ACCESS_KEY` | From Step 2 |
-| `AWS_REGION` | `eu-north-1` |
+| `AWS_REGION` | `ZXUtbm9ydGgtMQ==` (base64 of `eu-north-1` — see note below) |
 | `EKS_CLUSTER_NAME` | `sms-cluster` |
+
+**Why base64 for `AWS_REGION`?** GitHub redacts Secret values in job summaries. If the secret is plain `eu-north-1`, deploy URLs show `***`. Store the region as base64 instead (still a Secret):
+
+```bash
+echo -n 'eu-north-1' | base64
+# ZXUtbm9ydGgtMQ==
+```
+
+Plain `eu-north-1` still works for AWS; only the summary URL needs base64.
 
 ---
 

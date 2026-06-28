@@ -120,7 +120,7 @@ On **push to main** only:
 | `DOCKERHUB_TOKEN` | Docker Hub access token |
 | `AWS_ACCESS_KEY_ID` | IAM key for EKS (same user that provisions cluster) |
 | `AWS_SECRET_ACCESS_KEY` | IAM secret for EKS |
-| `AWS_REGION` | `eu-north-1` (Europe Stockholm) |
+| `AWS_REGION` | Base64 of your region, e.g. `ZXUtbm9ydGgtMQ==` for `eu-north-1` (avoids `***` in deploy URLs) |
 | `EKS_CLUSTER_NAME` | `sms-cluster` |
 
 ### First-time AWS setup

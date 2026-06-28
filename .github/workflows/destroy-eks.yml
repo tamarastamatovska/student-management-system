@@ -8,12 +8,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve AWS region
+        id: aws-region
+        env:
+          AWS_REGION_SECRET: ${{ secrets.AWS_REGION }}
+        run: |
+          region=$(bash .github/scripts/resolve-aws-region.sh)
+          echo "region=${region}" >> "$GITHUB_OUTPUT"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ steps.aws-region.outputs.region }}
 
       - name: Install eksctl
         run: |
@@ -24,14 +35,14 @@ jobs:
         run: |
           aws eks update-kubeconfig \
             --name "${{ secrets.EKS_CLUSTER_NAME }}" \
-            --region "${{ secrets.AWS_REGION }}" || true
+            --region "${{ steps.aws-region.outputs.region }}" || true
           kubectl delete namespace sms --ignore-not-found=true --timeout=120s || true
 
       - name: Delete EKS cluster
         run: |
           eksctl delete cluster \
             --name "${{ secrets.EKS_CLUSTER_NAME }}" \
-            --region "${{ secrets.AWS_REGION }}" \
+            --region "${{ steps.aws-region.outputs.region }}" \
             --wait
 
       - name: Summary
