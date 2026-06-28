@@ -158,17 +158,7 @@ Details: **[k8s/README.md](k8s/README.md)** · Setup: **[k8s/AWS-SETUP.md](k8s/A
 | PUT | `/api/students/{id}` | Update student |
 | DELETE | `/api/students/{id}` | Delete student |
 
-## Assignment checklist
 
-- [x] Public Git repository
-- [x] Dockerized frontend and backend
-- [x] Docker Compose orchestration
-- [x] CI pipeline (build, test, publish to Docker Hub)
-- [x] Kubernetes: Deployments + ConfigMaps/Secrets (frontend, backend)
-- [x] Kubernetes: Services (frontend, backend)
-- [x] Kubernetes: Ingress (ALB on EKS)
-- [x] Kubernetes: StatefulSet + ConfigMaps/Secrets (postgres)
-- [x] CD: deploy to namespace `sms` on EKS via GitHub Actions
 
 ## Environment variables
 
